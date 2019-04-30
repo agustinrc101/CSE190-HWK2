@@ -872,11 +872,11 @@ protected:
 		case TRACKING_FULL:			//Full Tracking
 			break;
 		case TRACKING_ORIENTATION:	//Orientation Tracking
-			view[3] = lastView[3];//glm::vec4(0, 0, 0, 1);
+			//view[3] = lastView[3];//glm::vec4(0, 0, 0, 1);
 			break;
 		case TRACKING_POSITION:		//Position Tracking
-			view = glm::mat4(1);
-			view[3] = pos;
+			//view = glm::mat4(1);
+			//view[3] = pos;
 			break;
 		case TRACKING_NONE:			//No Tracking
 			view = lastView;
