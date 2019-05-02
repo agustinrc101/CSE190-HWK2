@@ -659,12 +659,6 @@ protected:
   glm::mat4 ringBufferR[30] = { glm::mat4(1),glm::mat4(1),glm::mat4(1),glm::mat4(1),glm::mat4(1),glm::mat4(1),glm::mat4(1),glm::mat4(1),glm::mat4(1),glm::mat4(1),
 								glm::mat4(1),glm::mat4(1),glm::mat4(1),glm::mat4(1),glm::mat4(1),glm::mat4(1),glm::mat4(1),glm::mat4(1),glm::mat4(1),glm::mat4(1),
 								glm::mat4(1),glm::mat4(1),glm::mat4(1),glm::mat4(1),glm::mat4(1),glm::mat4(1),glm::mat4(1),glm::mat4(1),glm::mat4(1),glm::mat4(1) };
-  glm::mat4 ringBufferCL[30] = { glm::mat4(1),glm::mat4(1),glm::mat4(1),glm::mat4(1),glm::mat4(1),glm::mat4(1),glm::mat4(1),glm::mat4(1),glm::mat4(1),glm::mat4(1),
-								glm::mat4(1),glm::mat4(1),glm::mat4(1),glm::mat4(1),glm::mat4(1),glm::mat4(1),glm::mat4(1),glm::mat4(1),glm::mat4(1),glm::mat4(1),
-								glm::mat4(1),glm::mat4(1),glm::mat4(1),glm::mat4(1),glm::mat4(1),glm::mat4(1),glm::mat4(1),glm::mat4(1),glm::mat4(1),glm::mat4(1) };
-  glm::mat4 ringBufferCR[30] = { glm::mat4(1),glm::mat4(1),glm::mat4(1),glm::mat4(1),glm::mat4(1),glm::mat4(1),glm::mat4(1),glm::mat4(1),glm::mat4(1),glm::mat4(1),
-								glm::mat4(1),glm::mat4(1),glm::mat4(1),glm::mat4(1),glm::mat4(1),glm::mat4(1),glm::mat4(1),glm::mat4(1),glm::mat4(1),glm::mat4(1),
-								glm::mat4(1),glm::mat4(1),glm::mat4(1),glm::mat4(1),glm::mat4(1),glm::mat4(1),glm::mat4(1),glm::mat4(1),glm::mat4(1),glm::mat4(1) };
   int ringIndex = 0;
   int ringLag = 0;
   int renderingIndex = 0;
@@ -704,6 +698,9 @@ protected:
 	ovrVector3f handPosition[2];
 	handPosition[0] = handPoses[0].Position;
 	handPosition[1] = handPoses[1].Position;
+
+	//Send hands information to the project manager
+	projectManager->updateHands(ovr::toGlm(handPoses[ovrHand_Left]), ovr::toGlm(handPoses[ovrHand_Right]));
 
 	//=============================================================================BUTTON PRESSES
 	ovrInputState inputState;
@@ -883,20 +880,9 @@ protected:
 
 	//==============================================================================UPDATE
 
-	//Render ring info
-	int renderIndex = ringIndex - ringLag;
-	if (renderIndex < 0) renderIndex = 30 + renderIndex;
-
-	//Send hands information to the project manager
-	ringBufferCL[ringIndex] = ovr::toGlm(handPoses[ovrHand_Left]);
-	ringBufferCR[ringIndex] = ovr::toGlm(handPoses[ovrHand_Right]);
-	projectManager->updateHands(ringBufferCL[renderIndex], ringBufferCR[renderIndex]);
-
-	//Calls update in children
 	projectManager->update(ovr_GetTimeInSeconds() - lastTime);
 	lastTime = ovr_GetTimeInSeconds();
 
-	//Rendering lag
 	if (renderingIndex < renderingDelay) { renderingIndex++; return; }
 	renderingIndex = 0;
 
@@ -964,6 +950,9 @@ protected:
 
 		if (eye == 0)	ringBufferL[ringIndex] = view;
 		else			ringBufferR[ringIndex] = view;
+
+		int renderIndex = ringIndex - ringLag;
+		if (renderIndex < 0) renderIndex = 30 + renderIndex;
 
 		if (curEye == 0)	curView = ringBufferL[renderIndex]; 
 		else				curView = ringBufferR[renderIndex];
