@@ -511,7 +511,7 @@ public:
     _session = nullptr;
   }
 };
-
+#include <Windows.h>
 class RiftApp : public GlfwApp, public RiftManagerApp{
 public:
 
@@ -734,7 +734,7 @@ protected:
 	//Left Stick
 	setCubeScale(Input::getStickL().x * 0.0025f);
 	//Right Stick
-	iod += Input::getStickR().x * 0.01f;
+	iod += Input::getStickR().x * 0.007f;
 	if (iod < -0.1f) iod = -0.1f;
 	else if (iod > 0.3f) iod = 0.3f;
 	
@@ -890,7 +890,7 @@ protected:
 	//Send hands information to the project manager
 	ringBufferCL[ringIndex] = ovr::toGlm(handPoses[ovrHand_Left]);
 	ringBufferCR[ringIndex] = ovr::toGlm(handPoses[ovrHand_Right]);
-	projectManager->updateHands(ringBufferCL[renderIndex], ringBufferCR[renderIndex]);
+	
 
 	//Calls update in children
 	projectManager->update(ovr_GetTimeInSeconds() - lastTime);
@@ -969,6 +969,8 @@ protected:
 		if (curEye == 0)	curView = ringBufferL[renderIndex]; 
 		else				curView = ringBufferR[renderIndex];
 
+		projectManager->updateHands(ringBufferCL[renderIndex], ringBufferCR[renderIndex]);
+
 		//---------------------------------------------------Stereo Mode
 		if (render) {
 			//PARAMETERS: projection, view, render in stereo, render cubes, render custom skybox, render custom boxes
@@ -1019,6 +1021,8 @@ protected:
     glBlitFramebuffer(0, 0, _mirrorSize.x, _mirrorSize.y, 0, _mirrorSize.y, _mirrorSize.x, 0, GL_COLOR_BUFFER_BIT,
                       GL_NEAREST);
     glBindFramebuffer(GL_READ_FRAMEBUFFER, 0);
+
+	//Sleep(150);
   }
 
 	virtual void renderScene(const glm::mat4& projection, const glm::mat4& headPose, bool eye, bool box, bool stereoSky, bool customSkybox, bool customBox) = 0;
