@@ -30,6 +30,15 @@
     <ClCompile Include="TexturedCube.cpp">
       <Filter>Header Files</Filter>
     </ClCompile>
+    <ClCompile Include="ObjectManager.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="Model.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="Transform.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />
@@ -39,10 +48,14 @@
     <None Include="shader.vert">
       <Filter>Resource Files</Filter>
     </None>
-    <None Include="skybox.frag">
+    <None Include="shaders\color.frag" />
+    <None Include="shaders\color.vert" />
+    <None Include="shaders\TextureShader.frag" />
+    <None Include="shaders\TextureShader.vert" />
+    <None Include="shaders\skybox.vert">
       <Filter>Resource Files</Filter>
     </None>
-    <None Include="skybox.vert">
+    <None Include="shaders\skybox.frag">
       <Filter>Resource Files</Filter>
     </None>
   </ItemGroup>
@@ -63,6 +76,21 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="Input.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="ObjectManager.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Model.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Shaders.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="LoadPPM.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Transform.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

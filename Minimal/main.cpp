@@ -164,6 +164,7 @@ void glDebugCallbackHandler(GLenum source, GLenum type, GLuint id, GLenum severi
 #include <GLFW/glfw3.h>
 #include "Definitions.h"
 #include "Input.h"
+#include "ObjectManager.h"
 
 //init controller
 bool Input::indexTriggerL = false;
@@ -205,6 +206,7 @@ protected:
   unsigned int frame{0};
   
   //project vars
+  ObjectManager * projectManager;
   StereoMode stereoMode = STEREO_BOTH;
   DisplayMode displayMode = MODE_STEREO;
   TrackingMode trackingMode = TRACKING_FULL;
@@ -216,6 +218,10 @@ protected:
   bool y_press = false;
   bool ls_press = false;
   bool rs_press = false;
+  bool itr_press = false;
+  bool itl_press = false;
+  bool htr_press = false;
+  bool htl_press = false;
 
 public:
   GlfwApp()
@@ -251,6 +257,7 @@ public:
     postCreate();
 
     initGl();
+	projectManager = new ObjectManager();
 
     while (!glfwWindowShouldClose(window)){
       ++frame;
@@ -641,8 +648,21 @@ protected:
   }
 
   double lastTime = 0;
-  glm::mat4 lastView = glm::mat4(1);
+  glm::mat4 lastView [2] = { glm::mat4(1), glm::mat4(1) };
+  ovrVector3f lastPosition[2] = {ovr::fromGlm(glm::vec3(0)), ovr::fromGlm(glm::vec3(0))};
+  ovrQuatf lastRotation[2] = { ovr::fromGlm(glm::quat()), ovr::fromGlm(glm::quat())};
   float iod = 0.0f;
+  bool renderCustomBoxes = false;
+  glm::mat4 ringBufferL[30] = { glm::mat4(1),glm::mat4(1),glm::mat4(1),glm::mat4(1),glm::mat4(1),glm::mat4(1),glm::mat4(1),glm::mat4(1),glm::mat4(1),glm::mat4(1),
+								glm::mat4(1),glm::mat4(1),glm::mat4(1),glm::mat4(1),glm::mat4(1),glm::mat4(1),glm::mat4(1),glm::mat4(1),glm::mat4(1),glm::mat4(1),
+								glm::mat4(1),glm::mat4(1),glm::mat4(1),glm::mat4(1),glm::mat4(1),glm::mat4(1),glm::mat4(1),glm::mat4(1),glm::mat4(1),glm::mat4(1)};
+  glm::mat4 ringBufferR[30] = { glm::mat4(1),glm::mat4(1),glm::mat4(1),glm::mat4(1),glm::mat4(1),glm::mat4(1),glm::mat4(1),glm::mat4(1),glm::mat4(1),glm::mat4(1),
+								glm::mat4(1),glm::mat4(1),glm::mat4(1),glm::mat4(1),glm::mat4(1),glm::mat4(1),glm::mat4(1),glm::mat4(1),glm::mat4(1),glm::mat4(1),
+								glm::mat4(1),glm::mat4(1),glm::mat4(1),glm::mat4(1),glm::mat4(1),glm::mat4(1),glm::mat4(1),glm::mat4(1),glm::mat4(1),glm::mat4(1) };
+  int ringIndex = 0;
+  int ringLag = 0;
+  int renderingIndex = 0;
+  int renderingDelay = 0;
 
   void draw() final override{
     ovrPosef eyePoses[2];
@@ -657,7 +677,7 @@ protected:
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
    
 	//==============================================================================CONTROLLER
-		// Query Touch controllers. Query their parameters:
+	// Query Touch controllers. Query their parameters:
 	double displayMidpointSeconds = ovr_GetPredictedDisplayTime(_session, 0);
 	ovrTrackingState trackState = ovr_GetTrackingState(_session, displayMidpointSeconds, ovrTrue);
 
@@ -679,12 +699,8 @@ protected:
 	handPosition[0] = handPoses[0].Position;
 	handPosition[1] = handPoses[1].Position;
 
-	//Send positions to Waldo
-	//waldo->setHandL(ovr::toGlm(handPoses[ovrHand_Left]));
-	//waldo->setHandR(ovr::toGlm(handPoses[ovrHand_Right]));
-
-	//waldo->setHandQL(ovr::toGlm(handPoses[ovrHand_Left].Orientation));
-	//waldo->setHandQR(ovr::toGlm(handPoses[ovrHand_Right].Orientation));
+	//Send hands information to the project manager
+	projectManager->updateHands(ovr::toGlm(handPoses[ovrHand_Left]), ovr::toGlm(handPoses[ovrHand_Right]));
 
 	//=============================================================================BUTTON PRESSES
 	ovrInputState inputState;
@@ -718,6 +734,50 @@ protected:
 	iod += Input::getStickR().x * 0.01f;
 	if (iod < -0.1f) iod = -0.1f;
 	else if (iod > 0.3f) iod = 0.3f;
+	
+	//Hand Triggers - Right
+	if (Input::getHandTriggerR()) {
+		if (!htr_press) {
+			htr_press = true;
+			renderingDelay++;
+			if (renderingDelay > 10) renderingDelay = 10;
+			std::cout << "!! Rendering Delay: " << renderingDelay << " frames !!" << std::endl;
+		}
+	}
+	else htr_press = false;
+
+	//Hand Triggers - Left
+	if (Input::getHandTriggerL()) {
+		if (!htl_press) {
+			htl_press = true;
+			renderingDelay--;
+			if (renderingDelay < 0) renderingDelay = 0;
+			std::cout << "!! Rendering Delay: " << renderingDelay << " frames !!" << std::endl;
+		}
+	}
+	else htl_press = false;
+
+	//Index Triggers - Right
+	if (Input::getIndexTriggerR()) {
+		if (!itr_press) {
+			itr_press = true;
+			ringLag++;
+			if (ringLag >= 30) ringLag = 0;
+			std::cout << "!! Tracking Lag: " << ringLag << " frames !!" << std::endl;
+		}
+	}
+	else itr_press = false;
+
+	//Index Triggers - Left
+	if (Input::getIndexTriggerL()) {
+		if (!itl_press) {
+			itl_press = true;
+			ringLag--;
+			if (ringLag < 0) ringLag = 30 + ringLag;
+			std::cout << "!! Tracking Lag: " << ringLag << " frames !!" << std::endl;
+		}
+	}
+	else itl_press = false;
 
 	//Button X
 	if (Input::getButtonX()) {
@@ -728,9 +788,12 @@ protected:
 				stereoMode = STEREO_SKY;
 				break;
 			case STEREO_SKY:	//Skybox is stereo
-				stereoMode = STEREO_CUBE;
+				stereoMode = STEREO_ONESKY;
 				break;
-			case STEREO_CUBE:	//Cubes are stereo
+			case STEREO_ONESKY:	//Cubes are stereo
+				stereoMode = STEREO_CUSTOM_SKYBOX;
+				break;
+			case STEREO_CUSTOM_SKYBOX:	//Custom Skybox
 				stereoMode = STEREO_BOTH;
 				break;
 			default:
@@ -744,7 +807,7 @@ protected:
 	if (Input::getButtonY()) {
 		if (!y_press) {
 			y_press = true;
-			//TODO
+			renderCustomBoxes = !renderCustomBoxes;
 		}
 	}
 	else y_press = false;
@@ -817,31 +880,28 @@ protected:
 
 	//==============================================================================UPDATE
 
-	//waldo->update(ovr_GetTimeInSeconds() - lastTime);
-	//lastTime = ovr_GetTimeInSeconds();
+	projectManager->update(ovr_GetTimeInSeconds() - lastTime);
+	lastTime = ovr_GetTimeInSeconds();
+
+	if (renderingIndex < renderingDelay) { renderingIndex++; return; }
+	renderingIndex = 0;
 
 	//==============================================================================DRAW
 	ovr::for_each_eye([&](ovrEyeType eye){
-		//====================================================Setups
+		//---------------------------------------------------Setups
 		const auto& vp = _sceneLayer.Viewport[eye];
 		glViewport(vp.Pos.x, vp.Pos.y, vp.Size.w, vp.Size.h);
 		_sceneLayer.RenderPose[eye] = eyePoses[eye];
-		//====================================================IOD
+		//---------------------------------------------------IOD
 		ovrEyeRenderDesc& erd = _eyeRenderDescs[eye] = ovr_GetRenderDesc(_session, eye, _hmdDesc.DefaultEyeFov[eye]);
 		_viewScaleDesc.HmdToEyePose[eye] = erd.HmdToEyePose;
 
-		if (eye == 0)
-			_viewScaleDesc.HmdToEyePose[eye].Position.x -= iod;
-		else
-			_viewScaleDesc.HmdToEyePose[eye].Position.x += iod;
-		//====================================================
-
-
-
+		if (eye == 0)	_viewScaleDesc.HmdToEyePose[eye].Position.x -= iod;
+		else			_viewScaleDesc.HmdToEyePose[eye].Position.x += iod;
+		//---------------------------------------------------Display Mode
 		bool render = true;
 		short curEye = eye;
-
-		//Display Mode
+		
 		switch (displayMode) {
 		case MODE_STEREO:		//3d stereo
 			curEye = eye;
@@ -863,52 +923,72 @@ protected:
 			std::cerr << "====== Something went wrong with displayMode ======" << std::endl;
 			break;
 		}
+		//---------------------------------------------------Tracking Mode
+		glm::mat4 view = glm::mat4(1);
 
-		glm::mat4 view = glm::inverse(ovr::toGlm(eyePoses[curEye]));
-		glm::vec4 pos = view[3];
-
-		//Tracking Mode
 		switch (trackingMode) {
 		case TRACKING_FULL:			//Full Tracking
+			view = glm::inverse(ovr::toGlm(eyePoses[curEye]));
 			break;
 		case TRACKING_ORIENTATION:	//Orientation Tracking
-			//view[3] = lastView[3];//glm::vec4(0, 0, 0, 1);
+			eyePoses[curEye].Position = lastPosition[curEye];
+			view = glm::inverse(ovr::toGlm(eyePoses[curEye]));
 			break;
 		case TRACKING_POSITION:		//Position Tracking
-			//view = glm::mat4(1);
-			//view[3] = pos;
+			eyePoses[curEye].Orientation = lastRotation[curEye];
+			view = glm::inverse(ovr::toGlm(eyePoses[curEye]));
 			break;
 		case TRACKING_NONE:			//No Tracking
-			view = lastView;
+			view = lastView[curEye];
 			break;
 		default:
 			std::cerr << "====== Something went wrong with trackingMode ======= " << std::endl;
 			break;
 		}
+		//---------------------------------------------------Ring Buffer
+		glm::mat4 curView;
 
-		//Stereo Mode
+		if (eye == 0)	ringBufferL[ringIndex] = view;
+		else			ringBufferR[ringIndex] = view;
+
+		int renderIndex = ringIndex - ringLag;
+		if (renderIndex < 0) renderIndex = 30 + renderIndex;
+
+		if (curEye == 0)	curView = ringBufferL[renderIndex]; 
+		else				curView = ringBufferR[renderIndex];
+		//---------------------------------------------------Stereo Mode
 		if (render) {
+			//PARAMETERS: projection, view, render in stereo, render cubes, render custom skybox, render custom boxes
 			switch (stereoMode) {
 			case STEREO_BOTH:	//Skybox and cubes are stereo
-				renderScene(_eyeProjections[curEye], view, (curEye == 0), true, true);
+				renderScene(_eyeProjections[curEye], curView, (curEye == 0), true, true, false, renderCustomBoxes);
 				break;
 			case STEREO_SKY:	//Skybox is stereo
-				renderScene(_eyeProjections[curEye], view, (curEye == 0), false, true);
+				renderScene(_eyeProjections[curEye], curView, (curEye == 0), false, true, false, renderCustomBoxes);
 				break;
-			case STEREO_CUBE:	//Cubes are stereo
-				renderScene(_eyeProjections[curEye], view, (curEye == 0), false, false);
+			case STEREO_ONESKY:	//Stereo but one skybox image
+				renderScene(_eyeProjections[curEye], curView, (curEye == 0), false, false, false, renderCustomBoxes);
+				break;
+			case STEREO_CUSTOM_SKYBOX:
+				renderScene(_eyeProjections[curEye], curView, (curEye == 0), false, false, true, renderCustomBoxes);
 				break;
 			default:
 				std::cerr << "====== Something went wrong in StereoMode ======" << std::endl;
 				break;
 			}
-		}
 
-		lastView = view;
+			projectManager->draw(curView, _eyeProjections[curEye]);
+		}
+		//---------------------------------------------------Store variables for next frame
+		lastView[curEye] = view;
+		lastPosition[curEye] = eyePoses[curEye].Position;
+		lastRotation[curEye] = eyePoses[curEye].Orientation;
     });
 
 	//================================================================================= AFTER RENDERING
 
+	ringIndex++;
+	if (ringIndex >= 30) ringIndex = 0;
 
 	//=================================================================================
 
@@ -927,7 +1007,7 @@ protected:
     glBindFramebuffer(GL_READ_FRAMEBUFFER, 0);
   }
 
-	virtual void renderScene(const glm::mat4& projection, const glm::mat4& headPose, bool eye, bool box, bool stereoSky) = 0;
+	virtual void renderScene(const glm::mat4& projection, const glm::mat4& headPose, bool eye, bool box, bool stereoSky, bool customSkybox, bool customBox) = 0;
 	virtual void setCubeScale(float s) = 0;
 	virtual void resetCubeScale() = 0;
 };
@@ -951,8 +1031,12 @@ class Scene{
   GLuint shaderID;
 
   std::unique_ptr<TexturedCube> cube;
+  std::unique_ptr<TexturedCube> customCubeL;
+  std::unique_ptr<TexturedCube> customCubeR;
+
   std::unique_ptr<Skybox> skyboxLeft;
   std::unique_ptr<Skybox> skyboxRight;
+  std::unique_ptr<Skybox> skyboxCustom;
 
   const unsigned int GRID_SIZE{5};
 
@@ -968,33 +1052,56 @@ public:
 		instanceCount = instance_positions.size();
 
 		// Shader Program 
-		shaderID = LoadShaders("skybox.vert", "skybox.frag");
+		shaderID = LoadShaders(SHADER_SKYBOX_VERTEX, SHADER_SKYBOX_FRAGMENT);
 
-		cube = std::make_unique<TexturedCube>("cube"); 
+		cube = std::make_unique<TexturedCube>(TEXTURE_CUBE_STEAM);
+		customCubeL = std::make_unique<TexturedCube>(TEXTURE_CUBE_LEFT);
+		customCubeR = std::make_unique<TexturedCube>(TEXTURE_CUBE_RIGHT);
 
 		// 10m wide sky box: size doesn't matter though
-		skyboxLeft = std::make_unique<Skybox>(SKYBOX_LEFT);
-		skyboxRight = std::make_unique<Skybox>(SKYBOX_RIGHT);
+		skyboxLeft = std::make_unique<Skybox>(TEXTURE_SKYBOX_LEFT);
+		skyboxRight = std::make_unique<Skybox>(TEXTURE_SKYBOX_RIGHT);
+		skyboxCustom = std::make_unique<Skybox>(TEXTURE_SKYBOX_CUSTOM);
 		skyboxLeft->toWorld = glm::scale(glm::mat4(1.0f), glm::vec3(5.0f));
 		skyboxRight->toWorld = glm::scale(glm::mat4(1.0f), glm::vec3(5.0f));
+		skyboxCustom->toWorld = glm::scale(glm::mat4(1.0f), glm::vec3(5.0f));
 	}
 
-	void render(const glm::mat4& projection, const glm::mat4& view){
-		// Render two cubes
-		for (int i = 0; i < instanceCount; i++){
-			cube->toWorld = instance_positions[i] * glm::scale(glm::mat4(1.0f), glm::vec3(scaleFactor));
-			cube->draw(shaderID, projection, view);
-		}	
+	void render(const glm::mat4& projection, const glm::mat4& view, bool custom = false, bool eye = false) {
+		// Render two custom cubes
+		if (custom) {
+			for (int i = 0; i < instanceCount; i++) {
+				//Render custom LEFT box
+				if (eye) {
+					customCubeL->toWorld = instance_positions[i] * glm::scale(glm::mat4(1.0f), glm::vec3(scaleFactor));
+					customCubeL->draw(shaderID, projection, view);
+				}
+				//Render custom RIGHT box
+				else {
+					customCubeR->toWorld = instance_positions[i] * glm::scale(glm::mat4(1.0f), glm::vec3(scaleFactor));
+					customCubeR->draw(shaderID, projection, view);
+				}
+			}
+		}
+		//Render project cubes
+		else {
+			for (int i = 0; i < instanceCount; i++) {
+				cube->toWorld = instance_positions[i] * glm::scale(glm::mat4(1.0f), glm::vec3(scaleFactor));
+				cube->draw(shaderID, projection, view);
+			}
+		}
 	}
 
 	void renderSkyboxLeft(const glm::mat4& projection, const glm::mat4& view) {
-		// Render Skybox : remove view translation
 		skyboxLeft->draw(shaderID, projection, view);
 	}
 
 	void renderSkyboxRight(const glm::mat4& projection, const glm::mat4& view) {
-		// Render Skybox : remove view translation
 		skyboxRight->draw(shaderID, projection, view);
+	}
+
+	void renderCustomSkybox(const glm::mat4& projection, const glm::mat4& view) {
+		skyboxCustom->draw(shaderID, projection, view);
 	}
 };
 
@@ -1020,17 +1127,25 @@ protected:
     scene.reset();
   }
 
-	void renderScene(const glm::mat4& projection, const glm::mat4& headPose, bool eye, bool box, bool stereoSky) override {
+	void renderScene(const glm::mat4& projection, const glm::mat4& headPose, bool eye, bool box, bool stereoSky, bool customSkybox, bool customBox) override {
 		//Render Box
-		if(box) scene->render(projection, headPose);
-		
-		//Render Skybox in stereo (different image per eye)
-		if (stereoSky) {
-			if (eye) scene->renderSkyboxLeft(projection, headPose);
-			else scene->renderSkyboxRight(projection, headPose);
+		if (box) {
+			if(customBox) scene->render(projection, headPose, true, eye);
+			else scene->render(projection, headPose);
 		}
-		//Render Skybox in mono (same image per eye)
-		else scene->renderSkyboxLeft(projection, headPose);
+
+		//Renders custom skybox
+		if (customSkybox) scene->renderCustomSkybox(projection, headPose);
+		//Renders project skybox
+		else {
+			//Render Skybox in stereo (different image per eye)
+			if (stereoSky) {
+				if (eye) scene->renderSkyboxLeft(projection, headPose);
+				else scene->renderSkyboxRight(projection, headPose);
+			}
+			//Render Skybox in mono (same image per eye)
+			else scene->renderSkyboxLeft(projection, headPose);
+		}
 	}
 
 	void setCubeScale(float s) override {
