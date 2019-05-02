@@ -930,8 +930,9 @@ protected:
 			if (eye == 0) render = false;
 			break;
 		case MODE_INVERTED:		//Render left in right, and right in left
-			if (eye == 0) curEye = 1;
-			else curEye = 0;
+			renderIndex--; if (renderIndex < 0) renderIndex = 29;
+			if (eye == 0) { curEye = 1; }//  renderIndex--; if (renderIndex < 0) renderIndex = 29; }
+			else { curEye = 0; } //renderIndex++; if (renderIndex >= 30) renderIndex = 0; }
 			break;
 		default:
 			std::cerr << "====== Something went wrong with displayMode ======" << std::endl;
@@ -967,6 +968,7 @@ protected:
 
 		if (curEye == 0)	curView = ringBufferL[renderIndex]; 
 		else				curView = ringBufferR[renderIndex];
+
 		//---------------------------------------------------Stereo Mode
 		if (render) {
 			//PARAMETERS: projection, view, render in stereo, render cubes, render custom skybox, render custom boxes
@@ -997,6 +999,7 @@ protected:
     });
 
 	//================================================================================= AFTER RENDERING
+	if(displayMode == MODE_INVERTED) renderIndex++; if (renderIndex >= 30) renderIndex = 0;
 
 	ringIndex++;
 	if (ringIndex >= 30) ringIndex = 0;
